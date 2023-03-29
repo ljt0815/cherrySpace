@@ -5,7 +5,6 @@ const http = require('http');
 const app = express();
 const server = http.createServer(app);
 const io = socket(server);
-// const threejs = require('three');
 
 app.use('/js', express.static('./static/js'));
 app.use('/css', express.static('./static/css'));
@@ -27,24 +26,85 @@ app.get('/', function(req, res) {
     })
 })
 
+function getPlayerColor(){
+    return "#" + Math.floor(Math.random() * 16777215).toString(16);
+}
+
+class Player{
+    constructor(socket){
+        this.socket = socket;
+        this.scale = 4.5;
+        this.x = (Math.random() * 10) - 5;
+        this.y = 2.25;
+        this.z = -70;
+        this.color = getPlayerColor();
+    }
+
+    get id() {
+        return this.socket.id;
+    }
+}
+
+const players = [];
+const playerMap = {};
+
+function joinGame(socket){
+    let player = new Player(socket);
+
+    players.push(player);
+    playerMap[socket.id] = player;
+
+    return player;
+}
+
+function endGame(socket){
+    for( var i = 0 ; i < players.length; i++){
+        if(players[i].id == socket.id){
+            players.splice(i,1);
+            break
+        }
+    }
+    delete playerMap[socket.id];
+}
+
 io.sockets.on('connection', function(socket) {
-    console.log('유저 접속됨');
-
-    socket.on('newUser', function(name) {
-        console.log(name + '님이 접속하셨습니다.');
-        socket.name = name;
-        io.sockets.emit('update', {type: 'connect', name: 'SERVER', message: name + '님이 접속하였습니다.'});
-    })
-
-    socket.on('message', function(data) {
-        data.name = socket.name;
-        console.log(data);
-        socket.broadcast.emit('update', data);
-    })
+    console.log(`${socket.id}` + '님이 접속하셨습니다.');
 
     socket.on('disconnect', function() {
-        console.log(socket.name + '님이 나가셨습니다.');
-        socket.broadcast.emit('update', {type: 'disconnect', name: 'SERVER', message: socket.name + '님이 나가셨습니다.'}); 
+        console.log(`${socket.id}` + '님이 나가셨습니다.');
+        endGame(socket);
+        socket.broadcast.emit('leave_user', socket.id); 
+    });
+
+    let newPlayer = joinGame(socket);
+    socket.emit('user_id', socket.id);
+    for (let i = 0; i < players.length; i++) {
+        let player = players[i];
+        if (player.id === socket.id) continue ;
+        socket.emit('join_user', {
+            id: player.id,
+            x: player.x,
+            y: player.y,
+            z: player.z,
+            scale: player.scale
+        });
+    }
+    socket.broadcast.emit('join_user', {
+        id: socket.id,
+        x: newPlayer.x,
+        y: newPlayer.y,
+        z: newPlayer.z,
+        scale: newPlayer.scale
+    });
+
+    socket.on('send_location', function(data) {
+        socket.broadcast.emit('update_state', {
+            id: data.id,
+            x: data.x,
+            y: data.y,
+            z: data.z,
+            scale: data.scale
+        })
     })
 })
 

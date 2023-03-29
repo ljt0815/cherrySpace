@@ -3,8 +3,6 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls';
 import { KeyController } from './KeyController.js';
-// import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-// import * as dat from 'dat.gui';
 
 // Renderer
 const canvas = document.querySelector('#three-canvas');
@@ -19,6 +17,14 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 // Scene
 const scene = new THREE.Scene();
+
+// 소켓
+const socket = io();
+const loadingBuffer = [];
+socket.on('join_user', function(data) {
+	loadingBuffer.push(data);
+})
+
 
 // progoressbar
 
@@ -35,11 +41,11 @@ loadingManager.onProgress = function ( item, loaded, total ) {
 	progressBar.style.width = (loaded / total * 100) + '%';
 }
 loadingManager.onLoad = function () {
-	// character.
-	character.children[0].scale.set(4.5,4.5,4.5);
-	character.children[0].position.y = 2.25;
-	character.children[0].position.z = -70;
-	scene.add(character.children[0]);
+	// character.children[0].scale.set(4.5,4.5,4.5);
+	// character.children[0].position.y = 2.25;
+	// character.children[0].position.z = -70;
+	// scene.add(character.children[0]);
+	document.querySelector("#three-canvas").style.display = 'block';
 }
 
 
@@ -87,7 +93,7 @@ gltfLoader.load(
 		glb.scene.traverse(o => {
 			if (o.isMesh) o.castShadow = true;
 		})
-		chair.scale.set(0.5, 0.5, 0.5);
+		chair.scale.set(0.7, 0.7, 0.7);
 		chair.position.set(-10, 0, 0);
 		chair.rotation.z += Math.PI / 2;
 		scene.add(chair);
@@ -105,7 +111,7 @@ gltfLoader.load(
 
 // Camera
 const camera = new THREE.PerspectiveCamera(
-	35,
+	50,
 	window.innerWidth / window.innerHeight,
 	1,
 	1000
@@ -115,7 +121,6 @@ camera.position.z = -83;
 camera.lookAt(new THREE.Vector3(0,0,0));
 scene.add(camera);
 scene.background = new THREE.Color('#E2A6B4');
-// scene.background = new THREE.Color('#ffeaea');
 
 // Light
 const ambientLight = new THREE.AmbientLight('white', 0.5);
@@ -134,9 +139,6 @@ directionalLight.castShadow = true;
 scene.add(directionalLight);
 
 // Controls
-// const controls = new OrbitControls(camera, renderer.domElement);
-// controls.enableDamping = true;
-
 const controls = new PointerLockControls(camera, renderer.domElement);
 controls.pointerSpeed = 0.5;
 controls.domElement.addEventListener('click', () => {
@@ -159,30 +161,56 @@ scene.add(mesh);
 // 그리기
 const clock = new THREE.Clock();
 
-// 소켓
-const socket = io();
-
-
 // 키보드 컨트롤
 const keyController = new KeyController();
+function send_location() {
+	if (character) {
+		// console.log(socket.id);
+		socket.emit('send_location', {
+			id: socket.id,
+			x: character.position.x,
+			y: character.position.y,
+			z: character.position.z,
+			scale: character.scale.x
+		})
+	}
+}
 function walk() {
     if (keyController.keys['KeyW']) {
         controls.moveForward(0.1);
+		send_location();
     }
     if (keyController.keys['KeyS']) {
         controls.moveForward(-0.1);
+		send_location();
     }
     if (keyController.keys['KeyA']) {
         controls.moveRight(-0.1);
+		send_location();
     }
     if (keyController.keys['KeyD']) {
         controls.moveRight(0.1);
+		send_location();
     }
+}
+
+function new_user() {
+	for (let i = 0; i < loadingBuffer.length; i++) {
+		if (character == undefined) return ;
+		let player = SkeletonUtils.clone(character);
+		player.children[0].scale.set(loadingBuffer[i].scale, loadingBuffer[i].scale, loadingBuffer[i].scale);
+		player.children[0].position.x = loadingBuffer[i].x;
+		player.children[0].position.y = loadingBuffer[i].y;
+		player.children[0].position.z = loadingBuffer[i].z;
+		scene.add(player.children[0]);
+		loadingBuffer.splice(i,1);
+	}
 }
 
 function draw() {
 	const delta = clock.getDelta();
 	walk();
+	new_user();
 	// controls.update();
 	renderer.render(scene, camera);
 	renderer.setAnimationLoop(draw);
