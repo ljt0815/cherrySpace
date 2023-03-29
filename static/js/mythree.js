@@ -18,14 +18,6 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 // Scene
 const scene = new THREE.Scene();
 
-// 소켓
-const socket = io();
-const loadingBuffer = [];
-socket.on('join_user', function(data) {
-	loadingBuffer.push(data);
-})
-
-
 // progoressbar
 
 var progress = document.createElement('div');
@@ -41,11 +33,133 @@ loadingManager.onProgress = function ( item, loaded, total ) {
 	progressBar.style.width = (loaded / total * 100) + '%';
 }
 loadingManager.onLoad = function () {
-	// character.children[0].scale.set(4.5,4.5,4.5);
-	// character.children[0].position.y = 2.25;
-	// character.children[0].position.z = -70;
-	// scene.add(character.children[0]);
 	document.querySelector("#three-canvas").style.display = 'block';
+	const socket = io();
+
+	// const players = [];
+	
+	const playerMap = {};
+	socket.on('join_user', function(data) {
+		let player = SkeletonUtils.clone(character);
+		playerMap[data.id] = player.children[0];
+		player.children[0].scale.set(data.scale, data.scale, data.scale);
+		player.children[0].position.x = data.x;
+		player.children[0].position.y = data.y;
+		player.children[0].position.z = data.z;
+		scene.add(player.children[0]);
+	})
+	// Camera
+	const camera = new THREE.PerspectiveCamera(
+		50,
+		window.innerWidth / window.innerHeight,
+		1,
+		1000
+	);
+	socket.on('init', function(data) {
+		camera.position.x = data.x;
+		camera.position.z = data.z;
+	})
+	camera.position.y = 4;
+	camera.lookAt(new THREE.Vector3(0,4,1));
+	scene.add(camera);
+	scene.background = new THREE.Color('#E2A6B4');
+
+	// Light
+	const ambientLight = new THREE.AmbientLight('white', 0.5);
+	scene.add(ambientLight);
+
+	const directionalLight = new THREE.DirectionalLight('white', 1);
+	directionalLight.position.x = -20;
+	directionalLight.position.z = -20;
+	directionalLight.position.y = 100;
+	directionalLight.shadow.mapSize.width = 512;
+	directionalLight.shadow.mapSize.height = 512;
+	directionalLight.shadow.camera.near = 0.5;
+	directionalLight.shadow.camera.far = 1000;
+	directionalLight.shadow.camera = new THREE.OrthographicCamera( -100, 100, 100, -100, 0.5, 1000 );
+	directionalLight.castShadow = true;
+	scene.add(directionalLight);
+
+	// Controls
+	const controls = new PointerLockControls(camera, renderer.domElement);
+	controls.pointerSpeed = 0.5;
+	controls.domElement.addEventListener('click', () => {
+		controls.lock();
+	})
+
+	// Mesh
+	const geometry = new THREE.BoxGeometry(200, 1, 200);
+	const material = new THREE.MeshStandardMaterial({
+		map: floorTexture,
+	});
+	const mesh = new THREE.Mesh(geometry, material);
+	mesh.receiveShadow = true;
+	mesh.position.y = -0.5;
+	scene.add(mesh);
+
+	// 그리기
+	const clock = new THREE.Clock();
+
+	// 키보드 컨트롤
+	const keyController = new KeyController();
+	function send_location() {
+		let data = {};
+		data['id'] = socket.id;
+		data['x'] = camera.position.x;
+		data['z'] = camera.position.z;
+		socket.emit('send_location', data);
+	}
+	function walk() {
+		if (keyController.keys['KeyW']) {
+			controls.moveForward(0.1);
+			send_location();
+		}
+		if (keyController.keys['KeyS']) {
+			controls.moveForward(-0.1);
+			send_location();
+		}
+		if (keyController.keys['KeyA']) {
+			controls.moveRight(-0.1);
+			send_location();
+		}
+		if (keyController.keys['KeyD']) {
+			controls.moveRight(0.1);
+			send_location();
+		}
+	}
+
+	// const update_buffer = [];
+	socket.on('update_state', function(data) {
+		console.log(playerMap);
+		console.log(data.id);
+		console.log(playerMap[data.id]);
+		if (playerMap[data.id] != undefined)
+		{
+			playerMap[data.id].position.x = data.x;
+			playerMap[data.id].position.z = data.z;
+		}
+	})
+	
+	function draw() {
+		const delta = clock.getDelta();
+		walk();
+		// update_state();
+		// controls.update();
+		renderer.render(scene, camera);
+		renderer.setAnimationLoop(draw);
+	}
+
+	function setSize() {
+		camera.aspect = window.innerWidth / window.innerHeight;
+		camera.updateProjectionMatrix();
+		renderer.setSize(window.innerWidth, window.innerHeight);
+		renderer.render(scene, camera);
+	}
+
+	// 이벤트
+	window.addEventListener('resize', setSize);
+
+	draw();
 }
 
 
@@ -108,122 +222,3 @@ gltfLoader.load(
 		})
 	}
 )
-
-// Camera
-const camera = new THREE.PerspectiveCamera(
-	50,
-	window.innerWidth / window.innerHeight,
-	1,
-	1000
-);
-camera.position.y = 4;
-camera.position.z = -83;
-camera.lookAt(new THREE.Vector3(0,0,0));
-scene.add(camera);
-scene.background = new THREE.Color('#E2A6B4');
-
-// Light
-const ambientLight = new THREE.AmbientLight('white', 0.5);
-scene.add(ambientLight);
-
-const directionalLight = new THREE.DirectionalLight('white', 1);
-directionalLight.position.x = -20;
-directionalLight.position.z = -20;
-directionalLight.position.y = 100;
-directionalLight.shadow.mapSize.width = 512;
-directionalLight.shadow.mapSize.height = 512;
-directionalLight.shadow.camera.near = 0.5;
-directionalLight.shadow.camera.far = 1000;
-directionalLight.shadow.camera = new THREE.OrthographicCamera( -100, 100, 100, -100, 0.5, 1000 );
-directionalLight.castShadow = true;
-scene.add(directionalLight);
-
-// Controls
-const controls = new PointerLockControls(camera, renderer.domElement);
-controls.pointerSpeed = 0.5;
-controls.domElement.addEventListener('click', () => {
-	controls.lock();
-})
-
-// Player
-const players = [];
-
-// Mesh
-const geometry = new THREE.BoxGeometry(200, 1, 200);
-const material = new THREE.MeshStandardMaterial({
-	map: floorTexture,
-});
-const mesh = new THREE.Mesh(geometry, material);
-mesh.receiveShadow = true;
-mesh.position.y = -0.5;
-scene.add(mesh);
-
-// 그리기
-const clock = new THREE.Clock();
-
-// 키보드 컨트롤
-const keyController = new KeyController();
-function send_location() {
-	if (character) {
-		// console.log(socket.id);
-		socket.emit('send_location', {
-			id: socket.id,
-			x: character.position.x,
-			y: character.position.y,
-			z: character.position.z,
-			scale: character.scale.x
-		})
-	}
-}
-function walk() {
-    if (keyController.keys['KeyW']) {
-        controls.moveForward(0.1);
-		send_location();
-    }
-    if (keyController.keys['KeyS']) {
-        controls.moveForward(-0.1);
-		send_location();
-    }
-    if (keyController.keys['KeyA']) {
-        controls.moveRight(-0.1);
-		send_location();
-    }
-    if (keyController.keys['KeyD']) {
-        controls.moveRight(0.1);
-		send_location();
-    }
-}
-
-function new_user() {
-	for (let i = 0; i < loadingBuffer.length; i++) {
-		if (character == undefined) return ;
-		let player = SkeletonUtils.clone(character);
-		player.children[0].scale.set(loadingBuffer[i].scale, loadingBuffer[i].scale, loadingBuffer[i].scale);
-		player.children[0].position.x = loadingBuffer[i].x;
-		player.children[0].position.y = loadingBuffer[i].y;
-		player.children[0].position.z = loadingBuffer[i].z;
-		scene.add(player.children[0]);
-		loadingBuffer.splice(i,1);
-	}
-}
-
-function draw() {
-	const delta = clock.getDelta();
-	walk();
-	new_user();
-	// controls.update();
-	renderer.render(scene, camera);
-	renderer.setAnimationLoop(draw);
-}
-
-function setSize() {
-	camera.aspect = window.innerWidth / window.innerHeight;
-	camera.updateProjectionMatrix();
-	renderer.setSize(window.innerWidth, window.innerHeight);
-	renderer.render(scene, camera);
-}
-
-// 이벤트
-window.addEventListener('resize', setSize);
-
-draw();

@@ -77,7 +77,10 @@ io.sockets.on('connection', function(socket) {
     });
 
     let newPlayer = joinGame(socket);
-    socket.emit('user_id', socket.id);
+    socket.emit('init', {
+        x: newPlayer.x,
+        z: newPlayer.z
+    });
     for (let i = 0; i < players.length; i++) {
         let player = players[i];
         if (player.id === socket.id) continue ;
@@ -101,9 +104,7 @@ io.sockets.on('connection', function(socket) {
         socket.broadcast.emit('update_state', {
             id: data.id,
             x: data.x,
-            y: data.y,
-            z: data.z,
-            scale: data.scale
+            z: data.z
         })
     })
 })
