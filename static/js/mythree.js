@@ -36,8 +36,6 @@ loadingManager.onLoad = function () {
 	document.querySelector("#three-canvas").style.display = 'block';
 	const socket = io();
 
-	// const players = [];
-	
 	const playerMap = {};
 	socket.on('join_user', function(data) {
 		let player = SkeletonUtils.clone(character);
@@ -46,6 +44,7 @@ loadingManager.onLoad = function () {
 		player.children[0].position.x = data.x;
 		player.children[0].position.y = data.y;
 		player.children[0].position.z = data.z;
+		player.children[0].name = data.id; 
 		scene.add(player.children[0]);
 	})
 	// Camera
@@ -113,19 +112,15 @@ loadingManager.onLoad = function () {
 	function walk() {
 		if (keyController.keys['KeyW']) {
 			controls.moveForward(0.1);
-			// send_location();
 		}
 		if (keyController.keys['KeyS']) {
 			controls.moveForward(-0.1);
-			// send_location();
 		}
 		if (keyController.keys['KeyA']) {
 			controls.moveRight(-0.1);
-			// send_location();
 		}
 		if (keyController.keys['KeyD']) {
 			controls.moveRight(0.1);
-			// send_location();
 		}
 	}
 
@@ -138,13 +133,16 @@ loadingManager.onLoad = function () {
 			playerMap[data.id].rotation.y = data.rotateZ;
 		}
 	})
+
+	socket.on('leave_user', function(data) {
+		scene.remove(playerMap[data]);
+		delete playerMap[data];
+	})
 	
 	function draw() {
 		const delta = clock.getDelta();
 		send_location();
 		walk();
-		// update_state();
-		// controls.update();
 		renderer.render(scene, camera);
 		renderer.setAnimationLoop(draw);
 	}
