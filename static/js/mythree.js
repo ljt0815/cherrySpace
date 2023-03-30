@@ -107,41 +107,41 @@ loadingManager.onLoad = function () {
 		data['id'] = socket.id;
 		data['x'] = camera.position.x;
 		data['z'] = camera.position.z;
+		data['rotateZ'] = camera.rotation.z;
 		socket.emit('send_location', data);
 	}
 	function walk() {
 		if (keyController.keys['KeyW']) {
 			controls.moveForward(0.1);
-			send_location();
+			// send_location();
 		}
 		if (keyController.keys['KeyS']) {
 			controls.moveForward(-0.1);
-			send_location();
+			// send_location();
 		}
 		if (keyController.keys['KeyA']) {
 			controls.moveRight(-0.1);
-			send_location();
+			// send_location();
 		}
 		if (keyController.keys['KeyD']) {
 			controls.moveRight(0.1);
-			send_location();
+			// send_location();
 		}
 	}
 
 	// const update_buffer = [];
 	socket.on('update_state', function(data) {
-		console.log(playerMap);
-		console.log(data.id);
-		console.log(playerMap[data.id]);
 		if (playerMap[data.id] != undefined)
 		{
 			playerMap[data.id].position.x = data.x;
 			playerMap[data.id].position.z = data.z;
+			playerMap[data.id].rotation.y = data.rotateZ;
 		}
 	})
 	
 	function draw() {
 		const delta = clock.getDelta();
+		send_location();
 		walk();
 		// update_state();
 		// controls.update();

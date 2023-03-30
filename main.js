@@ -37,6 +37,7 @@ class Player{
         this.x = (Math.random() * 10) - 5;
         this.y = 2.25;
         this.z = -70;
+        this.rotateZ = 0;
         this.color = getPlayerColor();
     }
 
@@ -104,7 +105,8 @@ io.sockets.on('connection', function(socket) {
         socket.broadcast.emit('update_state', {
             id: data.id,
             x: data.x,
-            z: data.z
+            z: data.z,
+            rotateZ: data.rotateZ
         })
     })
 })
